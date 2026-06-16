@@ -17,7 +17,9 @@ if (-not (Test-Path $RutaCUARENTENA)){
 for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
 
 	Write-Progress -Activity "Cargando el Directorio" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
+
 	$Diccionario[$Fotos[$i].FullName] = (Get-FileHash $Fotos[$i] -Algorithm MD5).hash
+
 
 
 }
@@ -40,11 +42,13 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
 			$ContCoincidencias++
 			$HuboCoincidencias = $True
 
-			$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)-$($ContCoincidencias)$($Fotos[$i].Extension)"
 
+			if (Test-Path $Fotos[$c].FullName){
+				
+				$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)-$($ContCoincidencias)$($Fotos[$i].Extension)"
+				Move-Item -Path $Fotos[$c].FullName -Destination $Destino
 
-			Move-Item -Path $Fotos[$c].FullName -Destination $Destino
-
+			}
 
 
 
@@ -54,12 +58,15 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
 	}
 
 	if ($HuboCoincidencias){
+		if (Test-Path $Fotos[$i].FullName){
+			
+			$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)$($Fotos[$i].Extension)"
+			Move-Item -Path $Fotos[$i].FullName -Destination $Destino
 
 
-		$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)$($Fotos[$i].Extension)"
-		Move-Item -Path $Fotos[$i].FullName -Destination $Destino
+		}
 
-
+	
 	}
 
 
