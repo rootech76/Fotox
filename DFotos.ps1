@@ -1,7 +1,13 @@
 #Procesamiento de fotos duplicadas
 
-$Fotos = Get-ChildItem -Path 'R:\Midia\Fotos' -Recurse -file
+$Fotos = Get-ChildItem -Path 'R:\Midia\Fotos' -Recurse -file | Where-Object { $_.FullName -notlike '*CUARENTENA*' }
 $Diccionario = @{}
+
+if (-not (Test-Path R:\Midia\Fotos\CUARENTENA)){
+
+	New-Item -ItemType Directory -Path  R:\Midia\Fotos -Name CUARENTENA 
+
+}
 
 
 
