@@ -45,10 +45,28 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
 
 			if (Test-Path $Fotos[$c].FullName){
 				
-				$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)-$($ContCoincidencias)$($Fotos[$i].Extension)"
+				$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)-$($ContCoincidencias)$($Fotos[$c].Extension)"
 				Move-Item -Path $Fotos[$c].FullName -Destination $Destino
 
 			}
+
+		 }
+
+		 else{
+			 $distancia = python "R:\WorkStation\Scripts\Nuevo Depurador de Fotos\Compara_phash.py" $Fotos[$i].FullName $Fotos[$c].FullName
+
+				if ([int]$distancia -le 20){
+
+					$ContCoincidencias++
+					$HuboCoincidencias = $True
+
+					$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)-$($ContCoincidencias)$($Fotos[$c].Extension)"
+
+
+					Move-Item -Path $Fotos[$c].FullName -Destination $Destino
+					
+					
+				}
 
 
 
