@@ -20,9 +20,11 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
 
 	$Diccionario[$Fotos[$i].FullName] = (Get-FileHash $Fotos[$i] -Algorithm MD5).hash
 
-	Write-Host "El directorio fue cargado ..."
 
 }
+
+
+Write-Host "El directorio fue cargado ..."
 
 
 #Comparar y Mover fotos duplucadas a cuarentena
