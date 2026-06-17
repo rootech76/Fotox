@@ -1,93 +1,77 @@
 #Procesamiento de fotos duplicadas
-
 $Fotos = Get-ChildItem -Path 'R:\Midia\Fotos' -Recurse -file | Where-Object { $_.FullName -notlike '*CUARENTENA*' }
 $Diccionario = @{}
 $RutaCUARENTENA = 'R:\Midia\Fotos\CUARENTENA'
+$RutaScript = 'R:\WorkStation\Scripts\Nuevo Depurador de Fotos'
+$ArchivoRestantes = Join-Path $RutaScript 'fotos_restantes.txt'
+$ArchivoSimilares = Join-Path $RutaScript 'similares.txt'
 
 if (-not (Test-Path $RutaCUARENTENA)){
-
-	New-Item -ItemType Directory -Path $RutaCUARENTENA   
-
+    New-Item -ItemType Directory -Path $RutaCUARENTENA
 }
 
-
-
-# Almacenando Rutas y Hashes en el diccionario
-
+# Fase 1 - Calcular MD5
+$FotosRestantes = [System.Collections.Generic.List[string]]::new()
 for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
-
-	Write-Progress -Activity "Cargando el Directorio" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
-
-	$Diccionario[$Fotos[$i].FullName] = (Get-FileHash $Fotos[$i] -Algorithm MD5).hash
-
-
+    Write-Progress -Activity "Cargando el Directorio" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
+    $Diccionario[$Fotos[$i].FullName] = (Get-FileHash $Fotos[$i] -Algorithm MD5).Hash
 }
 
-
-Write-Host "El directorio fue cargado ..."
-
-
-#Comparar y Mover fotos duplucadas a cuarentena
-
+# Fase 2 - Comparar MD5 y mover duplicados exactos
+$FotosMovidas = @{}
 for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
+    Write-Progress -Activity "Comparando MD5" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
+    
+    if ($FotosMovidas[$Fotos[$i].FullName]){ continue }
+    
+    $ContCoincidencias = 0
+    $HuboCoincidencias = $False
 
-	Write-Progress -Activity "Comparando Fotos" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
-
-	$ContCoincidencias = 0
-	$HuboCoincidencias = $False
-
-
-	for ($c = $i + 1 ; $c -lt $Fotos.Count ; $c++){
-
-		if ($Diccionario[$Fotos[$i].FullName] -eq $Diccionario[$Fotos[$c].FullName]){
-
-			$ContCoincidencias++
-			$HuboCoincidencias = $True
-
-
-			if (Test-Path $Fotos[$c].FullName){
-				
-				$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)-$($ContCoincidencias)$($Fotos[$c].Extension)"
-				Move-Item -Path $Fotos[$c].FullName -Destination $Destino
-
-			}
-
-		 }
-
-		 else{
-			 $distancia = python "R:\WorkStation\Scripts\Nuevo Depurador de Fotos\Compara_phash.py" $Fotos[$i].FullName $Fotos[$c].FullName
-
-				if ([int]$distancia -le 10){
-
-					$ContCoincidencias++
-					$HuboCoincidencias = $True
-
-					$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)-$($ContCoincidencias)$($Fotos[$c].Extension)"
-
-
-					Move-Item -Path $Fotos[$c].FullName -Destination $Destino
-					
-					
-				}
-
-
-
-
-		}
-
-	}
-
-	if ($HuboCoincidencias){
-		if (Test-Path $Fotos[$i].FullName){
-			
-			$Destino = Join-Path -Path $RutaCUARENTENA  -ChildPath "$($i)$($Fotos[$i].Extension)"
-			Move-Item -Path $Fotos[$i].FullName -Destination $Destino
-
-
-		}
-
-	
-	}
-
-
+    for ($c = $i + 1 ; $c -lt $Fotos.Count ; $c++){
+        if ($FotosMovidas[$Fotos[$c].FullName]){ continue }
+        
+        if ($Diccionario[$Fotos[$i].FullName] -eq $Diccionario[$Fotos[$c].FullName]){
+            $ContCoincidencias++
+            $HuboCoincidencias = $True
+            if (Test-Path $Fotos[$c].FullName){
+                $Destino = Join-Path $RutaCUARENTENA "$($i)-$($ContCoincidencias)$($Fotos[$c].Extension)"
+                Move-Item -Path $Fotos[$c].FullName -Destination $Destino
+                $FotosMovidas[$Fotos[$c].FullName] = $True
+            }
+        }
+    }
+    if ($HuboCoincidencias){
+        if (Test-Path $Fotos[$i].FullName){
+            $Destino = Join-Path $RutaCUARENTENA "$($i)$($Fotos[$i].Extension)"
+            Move-Item -Path $Fotos[$i].FullName -Destination $Destino
+            $FotosMovidas[$Fotos[$i].FullName] = $True
+        }
+    } else {
+        $FotosRestantes.Add($Fotos[$i].FullName)
+    }
 }
+
+# Escribir fotos restantes para Python
+$FotosRestantes | Set-Content $ArchivoRestantes
+
+# Fase 3 - Comparar con pHash via Python
+Write-Host "Iniciando comparación visual con pHash..."
+python (Join-Path $RutaScript 'Compara_phash.py') $ArchivoRestantes $ArchivoSimilares
+
+# Fase 4 - Mover similares detectados por pHash
+if (Test-Path $ArchivoSimilares){
+    $Similares = Get-Content $ArchivoSimilares
+    $ContSimilar = 0
+    foreach ($ruta in $Similares){
+        if (Test-Path $ruta){
+            $archivo = Get-Item $ruta
+            $ContSimilar++
+            $Destino = Join-Path $RutaCUARENTENA "phash-$($ContSimilar)$($archivo.Extension)"
+            Move-Item -Path $ruta -Destination $Destino
+        }
+    }
+    Remove-Item $ArchivoSimilares
+}
+
+Remove-Item $ArchivoRestantes
+Write-Host "¡Proceso completado!"

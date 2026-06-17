@@ -1,17 +1,45 @@
 import sys
 import warnings
+import json
 from PIL import Image
 import imagehash
 
-
-ruta1 = sys.argv[1]
-ruta2 = sys.argv[2]
-
 warnings.filterwarnings('ignore')
 
-hash1 = imagehash.phash(Image.open(ruta1))
-hash2 = imagehash.phash(Image.open(ruta2))
+archivo_entrada = sys.argv[1]
+archivo_salida = sys.argv[2]
+UMBRAL = 10
 
-diferencia = hash1 - hash2
+with open(archivo_entrada, 'r', encoding='utf-8') as f:
+    rutas = f.read().splitlines()
 
-print(diferencia)
+# Calcular todos los pHash de una vez
+print(f"Calculando pHash de {len(rutas)} fotos...")
+hashes = {}
+for i, ruta in enumerate(rutas):
+    try:
+        hashes[ruta] = imagehash.phash(Image.open(ruta))
+        print(f"\rCalculando pHash {i+1} de {len(rutas)}", end='')
+    except Exception:
+        pass
+
+print("\nComparando pares...")
+similares = []
+rutas_lista = list(hashes.keys())
+movidas = set()
+
+for i in range(len(rutas_lista)):
+    if rutas_lista[i] in movidas:
+        continue
+    for c in range(i + 1, len(rutas_lista)):
+        if rutas_lista[c] in movidas:
+            continue
+        distancia = hashes[rutas_lista[i]] - hashes[rutas_lista[c]]
+        if distancia <= UMBRAL:
+            similares.append(rutas_lista[c])
+            movidas.add(rutas_lista[c])
+
+with open(archivo_salida, 'w', encoding='utf-8') as f:
+    f.write('\n'.join(similares))
+
+print(f"Similares encontrados: {len(similares)}")
