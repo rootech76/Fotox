@@ -20,7 +20,7 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
 
 	$Diccionario[$Fotos[$i].FullName] = (Get-FileHash $Fotos[$i] -Algorithm MD5).hash
 
-
+	Write-Host "El directorio fue cargado ..."
 
 }
 
@@ -55,7 +55,7 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
 		 else{
 			 $distancia = python "R:\WorkStation\Scripts\Nuevo Depurador de Fotos\Compara_phash.py" $Fotos[$i].FullName $Fotos[$c].FullName
 
-				if ([int]$distancia -le 20){
+				if ([int]$distancia -le 10){
 
 					$ContCoincidencias++
 					$HuboCoincidencias = $True
