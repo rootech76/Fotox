@@ -1,8 +1,14 @@
-#Procesamiento de fotos duplicadas
-$Fotos = Get-ChildItem -Path 'R:\Midia\Fotos' -Recurse -file | Where-Object { $_.FullName -notlike '*CUARENTENA*' }
-$Diccionario = @{}
+
+#Fotox - Procesamiento de fotos duplicadas
+#$RutaFotos = Read-Host "Ruta del directorio de fotos"
+#$RutaCUARENTENA = Read-Host "Ruta para la carpeta CUARENTENA"
+
 $RutaCUARENTENA = 'R:\Midia\Fotos\CUARENTENA'
-$RutaScript = 'R:\WorkStation\Scripts\Nuevo Depurador de Fotos'
+$RutaScript = 'R:\WorkStation\Scripts\Fotox'
+
+$Fotos = Get-ChildItem -Path $RutaFotos -Recurse -file | Where-Object { $_.FullName -notlike '*CUARENTENA*' }
+$Diccionario = @{}
+$RutaScript = 'R:\WorkStation\Scripts\Fotox'
 $ArchivoRestantes = Join-Path $RutaScript 'fotos_restantes.txt'
 $ArchivoSimilares = Join-Path $RutaScript 'similares.txt'
 
@@ -40,7 +46,8 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
             $ContCoincidencias++
             $HuboCoincidencias = $True
             if (Test-Path $Fotos[$c].FullName){
-                $Destino = Join-Path $RutaCUARENTENA "md5-$($GrupoActual)-$($ContCoincidencias)$($Fotos[$c].Extension)"
+                $timestamp = Get-Date -Format "ddMMyyyyyHHmmssfff"
+                $Destino = Join-Path $RutaCUARENTENA "md5-$($GrupoActual)-$($ContCoincidencias)_$($timestamp)$($Fotos[$c].Extension)"
                 Move-Item -Path $Fotos[$c].FullName -Destination $Destino
                 $FotosMovidas[$Fotos[$c].FullName] = $True
             }
@@ -48,7 +55,8 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
     }
     if ($HuboCoincidencias){
         if (Test-Path $Fotos[$i].FullName){
-            $Destino = Join-Path $RutaCUARENTENA "md5-$($GrupoActual)$($Fotos[$i].Extension)"
+            $timestamp = Get-Date -Format "ddMMyyyyyHHmmssfff"
+            $Destino = Join-Path $RutaCUARENTENA "md5-$($GrupoActual)_$($timestamp)$($Fotos[$i].Extension)"
             Move-Item -Path $Fotos[$i].FullName -Destination $Destino
             $FotosMovidas[$Fotos[$i].FullName] = $True
         }
@@ -77,7 +85,8 @@ if (Test-Path $ArchivoSimilares){
         $ruta = $partes[2]
         if (Test-Path $ruta){
             $archivo = Get-Item $ruta
-            $Destino = Join-Path $RutaCUARENTENA "phash-$($grupo)$($tipo)$($archivo.Extension)"
+            $timestamp = Get-Date -Format "ddMMyyyyyHHmmssfff"
+            $Destino = Join-Path $RutaCUARENTENA "phash-$($grupo)$($tipo)_$($timestamp)$($archivo.Extension)"
             Move-Item -Path $ruta -Destination $Destino
         }
     }
