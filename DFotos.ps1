@@ -11,30 +11,36 @@ if (-not (Test-Path $RutaCUARENTENA)){
 }
 
 # Fase 1 - Calcular MD5
-$FotosRestantes = [System.Collections.Generic.List[string]]::new()
 for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
-    Write-Progress -Activity "Cargando el Directorio" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
+    Write-Progress -Activity "Fase 1 - Cargando hashes MD5" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
     $Diccionario[$Fotos[$i].FullName] = (Get-FileHash $Fotos[$i] -Algorithm MD5).Hash
 }
+Write-Progress -Activity "Fase 1 - Cargando hashes MD5" -Completed
 
 # Fase 2 - Comparar MD5 y mover duplicados exactos
 $FotosMovidas = @{}
+$FotosRestantes = [System.Collections.Generic.List[string]]::new()
+$GrupoActual = 0
+
 for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
-    Write-Progress -Activity "Comparando MD5" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
-    
+    Write-Progress -Activity "Fase 2 - Comparando MD5" -Status "$($i+1) de $($Fotos.Count)" -PercentComplete (($i / $Fotos.Count) * 100)
+
     if ($FotosMovidas[$Fotos[$i].FullName]){ continue }
-    
+
     $ContCoincidencias = 0
     $HuboCoincidencias = $False
 
     for ($c = $i + 1 ; $c -lt $Fotos.Count ; $c++){
         if ($FotosMovidas[$Fotos[$c].FullName]){ continue }
-        
+
         if ($Diccionario[$Fotos[$i].FullName] -eq $Diccionario[$Fotos[$c].FullName]){
+            if (-not $HuboCoincidencias){
+                $GrupoActual++
+            }
             $ContCoincidencias++
             $HuboCoincidencias = $True
             if (Test-Path $Fotos[$c].FullName){
-                $Destino = Join-Path $RutaCUARENTENA "$($i)-$($ContCoincidencias)$($Fotos[$c].Extension)"
+                $Destino = Join-Path $RutaCUARENTENA "$($GrupoActual)-$($ContCoincidencias)$($Fotos[$c].Extension)"
                 Move-Item -Path $Fotos[$c].FullName -Destination $Destino
                 $FotosMovidas[$Fotos[$c].FullName] = $True
             }
@@ -42,7 +48,7 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
     }
     if ($HuboCoincidencias){
         if (Test-Path $Fotos[$i].FullName){
-            $Destino = Join-Path $RutaCUARENTENA "$($i)$($Fotos[$i].Extension)"
+            $Destino = Join-Path $RutaCUARENTENA "$($GrupoActual)$($Fotos[$i].Extension)"
             Move-Item -Path $Fotos[$i].FullName -Destination $Destino
             $FotosMovidas[$Fotos[$i].FullName] = $True
         }
@@ -50,6 +56,9 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
         $FotosRestantes.Add($Fotos[$i].FullName)
     }
 }
+Write-Progress -Activity "Fase 2 - Comparando MD5" -Completed
+
+Write-Host "Duplicados exactos encontrados: $GrupoActual grupos"
 
 # Escribir fotos restantes para Python
 $FotosRestantes | Set-Content $ArchivoRestantes
@@ -61,12 +70,14 @@ python (Join-Path $RutaScript 'Compara_phash.py') $ArchivoRestantes $ArchivoSimi
 # Fase 4 - Mover similares detectados por pHash
 if (Test-Path $ArchivoSimilares){
     $Similares = Get-Content $ArchivoSimilares
-    $ContSimilar = 0
-    foreach ($ruta in $Similares){
+    foreach ($linea in $Similares){
+        $partes = $linea -split '\|'
+        $grupo = $partes[0]
+        $tipo = $partes[1]
+        $ruta = $partes[2]
         if (Test-Path $ruta){
             $archivo = Get-Item $ruta
-            $ContSimilar++
-            $Destino = Join-Path $RutaCUARENTENA "phash-$($ContSimilar)$($archivo.Extension)"
+            $Destino = Join-Path $RutaCUARENTENA "phash-$($grupo)$($tipo)$($archivo.Extension)"
             Move-Item -Path $ruta -Destination $Destino
         }
     }
