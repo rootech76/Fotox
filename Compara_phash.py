@@ -31,14 +31,14 @@ similares = []
 for i in range(len(rutas_lista)):
     if rutas_lista[i] in movidas:
         continue
-    
+
     hubo = False
     cont = 0
-    
+
     for c in range(i + 1, len(rutas_lista)):
         if rutas_lista[c] in movidas:
             continue
-        
+
         distancia = hashes[rutas_lista[i]] - hashes[rutas_lista[c]]
         if distancia <= UMBRAL:
             if not hubo:
@@ -47,7 +47,7 @@ for i in range(len(rutas_lista)):
             cont += 1
             similares.append(f"{grupo}-{cont}||{rutas_lista[c]}")
             movidas.add(rutas_lista[c])
-    
+
     if hubo:
         similares.append(f"{grupo}||{rutas_lista[i]}")
         movidas.add(rutas_lista[i])

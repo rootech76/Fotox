@@ -40,7 +40,7 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
             $ContCoincidencias++
             $HuboCoincidencias = $True
             if (Test-Path $Fotos[$c].FullName){
-                $Destino = Join-Path $RutaCUARENTENA "$($GrupoActual)-$($ContCoincidencias)$($Fotos[$c].Extension)"
+                $Destino = Join-Path $RutaCUARENTENA "md5-$($GrupoActual)-$($ContCoincidencias)$($Fotos[$c].Extension)"
                 Move-Item -Path $Fotos[$c].FullName -Destination $Destino
                 $FotosMovidas[$Fotos[$c].FullName] = $True
             }
@@ -48,7 +48,7 @@ for ($i = 0 ; $i -lt $Fotos.Count ; $i++){
     }
     if ($HuboCoincidencias){
         if (Test-Path $Fotos[$i].FullName){
-            $Destino = Join-Path $RutaCUARENTENA "$($GrupoActual)$($Fotos[$i].Extension)"
+            $Destino = Join-Path $RutaCUARENTENA "md5-$($GrupoActual)$($Fotos[$i].Extension)"
             Move-Item -Path $Fotos[$i].FullName -Destination $Destino
             $FotosMovidas[$Fotos[$i].FullName] = $True
         }
