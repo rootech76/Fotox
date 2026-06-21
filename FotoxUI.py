@@ -52,4 +52,28 @@ boton_cuarentena.grid(row=1, column=2, padx=10, pady=10)
 
 
 
+#fila 2 - Ruta de Cuarentena 
+var_recursivo = tk.BooleanVar(value=True)
+checkbox =tk.Checkbutton(ventana, text="Buscar en Sub-Carpetas", variable=var_recursivo)
+checkbox.grid(row=2, column=1, padx=10, pady=10)
+
+
+# Fila 3 - Umbral pHash
+label_umbral = tk.Label(ventana, text="Nivel de Similitud:")
+label_umbral.grid(row=3, column=0, padx=10, pady=10)
+
+spinbox_umbral = tk.Spinbox(ventana, from_=0, to=64, width=5)
+spinbox_umbral.delete(0, tk.END)
+spinbox_umbral.insert(0, 10)
+spinbox_umbral.grid(row=3, column=1, padx=10, pady=10, sticky='w')
+
+
+# Descripción debajo del spinbox
+label_desc_umbral = tk.Label(ventana, text="Menor número = solo fotos casi idénticas | Mayor número = fotos más diferentes", 
+                              fg='gray', font=('Arial', 8))
+label_desc_umbral.grid(row=4, column=1, padx=10, sticky='w')
+
+
+
+
 ventana.mainloop()
