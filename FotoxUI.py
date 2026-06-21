@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
+import threading
 
 ventana = tk.Tk()
 ventana.title("Fotox")
@@ -34,10 +35,22 @@ def buscar_cuarentena():
         entry_cuarentena.insert(0,ruta)
         verificar_rutas()
 
+def ejecutar_fotox():
+    # aquí irá la lógica de Fotox
+    # por ahora solo un test
+    log_mensaje("Fotox corriendo en hilo separado")
+
+def iniciar_ejecucion():
+    boton_ejecutar.config(state='disabled')  # deshabilita durante el proceso
+    hilo = threading.Thread(target=ejecutar_fotox)
+    hilo.start()
 
 
-
-
+def log_mensaje(mensaje):
+    log.config(state='normal')        # habilita para escribir
+    log.insert(tk.END, mensaje + '\n') # agrega el mensaje
+    log.see(tk.END)                    # hace scroll al final
+    log.config(state='disabled')      # deshabilita de nuevo
 
 
 #fila 0 - Ruta de Fotos
@@ -89,7 +102,13 @@ label_desc_umbral.pack(side='left', padx=5)
 
 
 
-boton_ejecutar = tk.Button(ventana, text="Ejecutar Fotox", width=20, state="disable")
+
+boton_ejecutar = tk.Button(ventana, text="Ejecutar Fotox", width=20, state='disabled', command=iniciar_ejecucion)
 boton_ejecutar.grid(row=4, column=1, pady=20)
+
+# Fila 5 - Log de resultados
+log = tk.Text(ventana, height=8, width=70, state='disabled')
+log.grid(row=5, column=0, columnspan=3, padx=10, pady=10)
+
 
 ventana.mainloop()
