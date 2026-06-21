@@ -7,7 +7,7 @@ warnings.filterwarnings('ignore')
 
 archivo_entrada = sys.argv[1]
 archivo_salida = sys.argv[2]
-UMBRAL = 10
+UMBRAL = 15
 
 with open(archivo_entrada, 'r', encoding='utf-8') as f:
     rutas = f.read().splitlines()

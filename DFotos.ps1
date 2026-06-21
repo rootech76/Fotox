@@ -1,5 +1,5 @@
 #Fotox - Procesamiento de fotos duplicadas
-$RutaFotos = 'R:\Midia\Fotos'
+$RutaFotos = 'R:\Midia\Fotos\test'
 $RutaCUARENTENA = 'R:\Midia\Fotos\CUARENTENA'
 $RutaScript = 'R:\WorkStation\Scripts\Fotox'
 $ArchivoRestantes = Join-Path $RutaScript 'fotos_restantes.txt'
