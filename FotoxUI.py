@@ -5,6 +5,7 @@ import os
 import hashlib
 import shutil
 from datetime import datetime
+from collections import defaultdict
 from PIL import Image
 import imagehash
 import warnings
@@ -18,6 +19,9 @@ ventana = tk.Tk()
 ventana.title("Fotox")
 ventana.geometry("650x520")
 ventana.resizable(False, False)
+
+# ─── Control de cancelación ──────────────────────────────────
+cancelar = threading.Event()
 
 # ─── Funciones de UI ─────────────────────────────────────────
 def verificar_rutas():
@@ -51,8 +55,15 @@ def actualizar_progreso(valor, texto):
     label_progreso.config(text=texto)
     ventana.update_idletasks()
 
+def cancelar_proceso():
+    cancelar.set()
+    log_mensaje("⚠️ Cancelando proceso...")
+    boton_cancelar.config(state='disabled')
+
 # ─── Lógica principal de Fotox ───────────────────────────────
 def ejecutar_fotox():
+    cancelar.clear()
+
     ruta_fotos      = os.path.normpath(entry_fotos.get())
     ruta_cuarentena = os.path.join(os.path.normpath(entry_cuarentena.get()), 'CUARENTENA')
     recursivo       = var_recursivo.get()
@@ -61,7 +72,7 @@ def ejecutar_fotox():
     log_mensaje(f"Ruta fotos: {ruta_fotos}")
     log_mensaje(f"Cuarentena: {ruta_cuarentena}")
     log_mensaje(f"Recursivo: {recursivo}")
-    log_mensaje(f"Umbral pHash: {umbral}")
+    log_mensaje(f"Umbral pHash+dHash: {umbral}")
 
     # Crear cuarentena
     os.makedirs(ruta_cuarentena, exist_ok=True)
@@ -70,15 +81,20 @@ def ejecutar_fotox():
     else:
         log_mensaje(f"❌ Error al crear cuarentena")
         boton_ejecutar.config(state='normal')
+        boton_cancelar.config(state='disabled')
         return
 
-    extensiones = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.mp4', '.mov', '.avi'}
+    extensiones_img   = {'.jpg', '.jpeg', '.png', '.gif', '.bmp'}
+    extensiones_video = {'.mp4', '.mov', '.avi'}
+    extensiones       = extensiones_img | extensiones_video
 
-    # ── Recopilar fotos ──────────────────────────────────────
-    log_mensaje("Buscando fotos...")
+    # ── Recopilar archivos ───────────────────────────────────
+    log_mensaje("Buscando archivos...")
     fotos = []
     if recursivo:
         for raiz, _, archivos in os.walk(ruta_fotos):
+            if cancelar.is_set():
+                break
             raiz_norm = os.path.normpath(raiz)
             if raiz_norm == ruta_cuarentena or raiz_norm.startswith(ruta_cuarentena + os.sep):
                 continue
@@ -91,95 +107,121 @@ def ejecutar_fotox():
             if os.path.isfile(ruta_completa) and os.path.splitext(archivo)[1].lower() in extensiones:
                 fotos.append(ruta_completa)
 
-    total = len(fotos)
-    log_mensaje(f"Fotos encontradas: {total}")
+    if cancelar.is_set():
+        log_mensaje("❌ Proceso cancelado.")
+        boton_ejecutar.config(state='normal')
+        boton_cancelar.config(state='disabled')
+        return
+
+    total        = len(fotos)
+    total_imgs   = sum(1 for f in fotos if os.path.splitext(f)[1].lower() in extensiones_img)
+    total_videos = sum(1 for f in fotos if os.path.splitext(f)[1].lower() in extensiones_video)
+    log_mensaje(f"Archivos encontrados: {total} ({total_imgs} fotos, {total_videos} videos)")
 
     if total == 0:
-        log_mensaje("⚠️ No se encontraron fotos.")
+        log_mensaje("⚠️ No se encontraron archivos.")
         boton_ejecutar.config(state='normal')
+        boton_cancelar.config(state='disabled')
         return
 
     # ── Fase 1 — Calcular MD5 ────────────────────────────────
     log_mensaje("Fase 1 — Calculando hashes MD5...")
-    diccionario = {}
+    grupos_md5 = defaultdict(list)
     for i, foto in enumerate(fotos):
+        if cancelar.is_set():
+            break
         try:
             with open(foto, 'rb') as f:
                 md5 = hashlib.md5(f.read()).hexdigest()
-            diccionario[foto] = md5
+            grupos_md5[md5].append(foto)
         except Exception as e:
             log_mensaje(f"Error MD5: {os.path.basename(foto)} → {e}")
-        actualizar_progreso((i + 1) / total * 40, f"Fase 1 — {i+1} de {total}")
+        actualizar_progreso((i + 1) / total * 30, f"Fase 1 — {i+1} de {total}")
 
-    # ── Fase 2 — Comparar MD5 ────────────────────────────────
-    log_mensaje("Fase 2 — Comparando duplicados exactos...")
+    if cancelar.is_set():
+        log_mensaje("❌ Proceso cancelado.")
+        boton_ejecutar.config(state='normal')
+        boton_cancelar.config(state='disabled')
+        return
+
+    # ── Fase 2 — Mover duplicados exactos ────────────────────
+    log_mensaje("Fase 2 — Moviendo duplicados exactos...")
     fotos_movidas   = set()
     fotos_restantes = []
     grupo_actual    = 0
 
-    for i in range(len(fotos)):
-        if fotos[i] in fotos_movidas:
-            continue
-
-        cont_coincidencias = 0
-        hubo_coincidencias = False
-
-        for c in range(i + 1, len(fotos)):
-            if fotos[c] in fotos_movidas:
-                continue
-            if diccionario.get(fotos[i]) == diccionario.get(fotos[c]):
-                if not hubo_coincidencias:
-                    grupo_actual += 1
-                cont_coincidencias += 1
-                hubo_coincidencias = True
-                if os.path.exists(fotos[c]):
-                    ext       = os.path.splitext(fotos[c])[1]
-                    timestamp = datetime.now().strftime("%d%m%Y%H%M%S%f")[:17]
-                    destino   = os.path.join(ruta_cuarentena, f"md5-{grupo_actual}-{cont_coincidencias}_{timestamp}{ext}")
-                    shutil.move(fotos[c], destino)
-                    fotos_movidas.add(fotos[c])
-
-        if hubo_coincidencias:
-            if os.path.exists(fotos[i]):
-                ext       = os.path.splitext(fotos[i])[1]
+    for md5, archivos in grupos_md5.items():
+        if cancelar.is_set():
+            break
+        if len(archivos) > 1:
+            grupo_actual += 1
+            for idx, archivo in enumerate(archivos):
+                if not os.path.exists(archivo):
+                    continue
+                ext       = os.path.splitext(archivo)[1]
                 timestamp = datetime.now().strftime("%d%m%Y%H%M%S%f")[:17]
-                destino   = os.path.join(ruta_cuarentena, f"md5-{grupo_actual}_{timestamp}{ext}")
-                shutil.move(fotos[i], destino)
-                fotos_movidas.add(fotos[i])
+                if idx == 0:
+                    destino = os.path.join(ruta_cuarentena, f"md5-{grupo_actual}_{timestamp}{ext}")
+                else:
+                    destino = os.path.join(ruta_cuarentena, f"md5-{grupo_actual}-{idx}_{timestamp}{ext}")
+                shutil.move(archivo, destino)
+                fotos_movidas.add(archivo)
         else:
-            fotos_restantes.append(fotos[i])
+            fotos_restantes.append(archivos[0])
+
+    if cancelar.is_set():
+        log_mensaje("❌ Proceso cancelado.")
+        boton_ejecutar.config(state='normal')
+        boton_cancelar.config(state='disabled')
+        return
 
     log_mensaje(f"Duplicados exactos: {grupo_actual} grupos")
-    log_mensaje(f"Fotos para pHash: {len(fotos_restantes)}")
+    log_mensaje(f"Archivos para análisis visual: {len(fotos_restantes)}")
 
     if len(fotos_restantes) == 0:
         actualizar_progreso(100, "¡Completado!")
         log_mensaje("✅ ¡Proceso completado!")
         boton_ejecutar.config(state='normal')
+        boton_cancelar.config(state='disabled')
         return
 
-    # ── Fase 3 — Calcular pHash ──────────────────────────────
-    log_mensaje("Fase 3 — Calculando pHash...")
-    hashes        = {}
-    errores_phash = 0
-    for i, ruta in enumerate(fotos_restantes):
+    # ── Fase 3 — Calcular pHash + dHash (solo imágenes) ─────
+    log_mensaje("Fase 3 — Calculando pHash y dHash...")
+    hashes_p      = {}
+    hashes_d      = {}
+    errores_hash  = 0
+    imgs_restantes = [f for f in fotos_restantes if os.path.splitext(f)[1].lower() in extensiones_img]
+
+    for i, ruta in enumerate(imgs_restantes):
+        if cancelar.is_set():
+            break
         try:
-            hashes[ruta] = imagehash.phash(Image.open(ruta))
+            img          = Image.open(ruta)
+            hashes_p[ruta] = imagehash.phash(img)
+            hashes_d[ruta] = imagehash.dhash(img)
         except Exception as e:
-            errores_phash += 1
-            log_mensaje(f"Error pHash: {os.path.basename(ruta)} → {e}")
-        actualizar_progreso(40 + (i + 1) / len(fotos_restantes) * 40,
-                            f"Fase 3 — {i+1} de {len(fotos_restantes)}")
+            errores_hash += 1
+            log_mensaje(f"Error hash: {os.path.basename(ruta)} → {e}")
+        actualizar_progreso(30 + (i + 1) / len(imgs_restantes) * 40,
+                            f"Fase 3 — {i+1} de {len(imgs_restantes)}")
 
-    log_mensaje(f"pHash calculados: {len(hashes)} | Errores: {errores_phash}")
+    if cancelar.is_set():
+        log_mensaje("❌ Proceso cancelado.")
+        boton_ejecutar.config(state='normal')
+        boton_cancelar.config(state='disabled')
+        return
 
-    # ── Fase 4 — Comparar pHash ──────────────────────────────
-    log_mensaje("Fase 4 — Comparando similares visuales...")
-    rutas_lista   = list(hashes.keys())
+    log_mensaje(f"Hashes calculados: {len(hashes_p)} | Errores: {errores_hash}")
+
+    # ── Fase 4 — Comparar pHash AND dHash ────────────────────
+    log_mensaje("Fase 4 — Comparando similares visuales (pHash AND dHash)...")
+    rutas_lista   = list(hashes_p.keys())
     movidas_phash = set()
     grupo_phash   = 0
 
     for i in range(len(rutas_lista)):
+        if cancelar.is_set():
+            break
         if rutas_lista[i] in movidas_phash:
             continue
 
@@ -187,10 +229,16 @@ def ejecutar_fotox():
         cont = 0
 
         for c in range(i + 1, len(rutas_lista)):
+            if cancelar.is_set():
+                break
             if rutas_lista[c] in movidas_phash:
                 continue
-            distancia = hashes[rutas_lista[i]] - hashes[rutas_lista[c]]
-            if distancia <= umbral:
+
+            dist_p = hashes_p[rutas_lista[i]] - hashes_p[rutas_lista[c]]
+            dist_d = hashes_d[rutas_lista[i]] - hashes_d[rutas_lista[c]]
+
+            # AND — ambos deben detectar similitud
+            if dist_p <= umbral and dist_d <= umbral:
                 if not hubo:
                     grupo_phash += 1
                     hubo = True
@@ -212,13 +260,19 @@ def ejecutar_fotox():
                 shutil.move(rutas_lista[i], destino)
                 movidas_phash.add(rutas_lista[i])
 
-    actualizar_progreso(100, "¡Completado!")
-    log_mensaje(f"Similares visuales: {len(movidas_phash)}")
-    log_mensaje("✅ ¡Proceso completado!")
+    if cancelar.is_set():
+        log_mensaje("❌ Proceso cancelado.")
+    else:
+        actualizar_progreso(100, "¡Completado!")
+        log_mensaje(f"Similares visuales: {len(movidas_phash)}")
+        log_mensaje("✅ ¡Proceso completado!")
+
     boton_ejecutar.config(state='normal')
+    boton_cancelar.config(state='disabled')
 
 def iniciar_ejecucion():
     boton_ejecutar.config(state='disabled')
+    boton_cancelar.config(state='normal')
     log.config(state='normal')
     log.delete(1.0, tk.END)
     log.config(state='disabled')
@@ -264,10 +318,15 @@ label_desc_umbral = tk.Label(frame_umbral,
                               fg='gray', font=('Arial', 8))
 label_desc_umbral.pack(side='left', padx=5)
 
-# Fila 4 - Botón Ejecutar
-boton_ejecutar = tk.Button(ventana, text="Ejecutar Fotox", width=20,
+# Fila 4 - Botones
+frame_botones = tk.Frame(ventana)
+frame_botones.grid(row=4, column=1, pady=10)
+boton_ejecutar = tk.Button(frame_botones, text="Ejecutar Fotox", width=20,
                            state='disabled', command=iniciar_ejecucion)
-boton_ejecutar.grid(row=4, column=1, pady=10)
+boton_ejecutar.pack(side='left', padx=5)
+boton_cancelar = tk.Button(frame_botones, text="Cancelar", width=10,
+                           state='disabled', command=cancelar_proceso, fg='red')
+boton_cancelar.pack(side='left', padx=5)
 
 # Fila 5 - Barra de progreso
 barra_progreso = ttk.Progressbar(ventana, length=600, mode='determinate')
