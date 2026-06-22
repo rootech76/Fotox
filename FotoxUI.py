@@ -346,7 +346,7 @@ label_progreso = tk.Label(ventana, text="", fg='gray', font=('Arial', 8))
 label_progreso.grid(row=6, column=0, columnspan=3)
 
 # Fila 7 - Log
-log = tk.Text(ventana, height=8, width=76, state='disabled', font=('Courier', 8))
+log = tk.Text(ventana, height=15, width=85, state='disabled', font=('Courier', 8))
 log.grid(row=7, column=0, columnspan=3, padx=10, pady=10)
 
 ventana.mainloop()
