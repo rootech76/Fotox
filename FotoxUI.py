@@ -9,16 +9,25 @@ from collections import defaultdict
 from PIL import Image
 import imagehash
 import warnings
+import os
+
+
+
 
 warnings.filterwarnings('ignore')
 
-UMBRAL_DEFAULT = 10
+UMBRAL_DEFAULT = 16
 
 # ─── Ventana principal ───────────────────────────────────────
 ventana = tk.Tk()
 ventana.title("Fotox")
 ventana.geometry("650x520")
 ventana.resizable(False, False)
+
+ruta_icono = os.path.join(os.path.dirname(__file__), "fotox.ico")
+ventana.iconbitmap(ruta_icono)
+
+
 
 # ─── Control de cancelación ──────────────────────────────────
 cancelar = threading.Event()
